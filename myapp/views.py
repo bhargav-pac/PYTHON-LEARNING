@@ -1,3 +1,4 @@
+import os
 from django.shortcuts import render,redirect
 from django.contrib.auth.models import User,auth
 from django.contrib.auth import authenticate
@@ -91,21 +92,33 @@ def profile(request,id):
     })
     
     
-def profileedit(request,id):
+@login_required
+def profileedit(request, id):
+    user = User.objects.get(id=id)  # Get the user object
     if request.method == 'POST':
-        firstname = request.POST['firstname']
-        lastname = request.POST['lastname']
-        email = request.POST['email']
+        user.first_name = request.POST.get('firstname')
+        user.last_name = request.POST.get('lastname')
+        user.email = request.POST.get('email')
+        user.phone_number = request.POST.get('phone_number')
+
+        # Handle profile picture update
+        if 'profile_picture' in request.FILES:
+            user.profile_picture = request.FILES['profile_picture']
+
+        if 'delete_picture' in request.POST and user.profile_picture:
+            # Delete the image file from the server
+            image_path = os.path.join(settings.MEDIA_ROOT, str(user.profile_picture))
+            if os.path.exists(image_path):
+                os.remove(image_path)  # Delete file from media folder
+            user.profile_picture = None  # Remove from database
     
-        user = User.objects.get(id=id)
-        user.first_name = firstname
-        user.email = email
-        user.last_name = lastname
-        user.save()
-        return profile(request,id)
-    return render(request,"profileedit.html",{
-        'user':User.objects.get(id=id),
-    })
+
+        user.save()  # Save the updated user object
+        messages.success(request, "Profile updated successfully!")
+
+        return redirect('profileedit', id=user.id)  # Redirect to same page after update
+
+    return render(request, "profileedit.html", {"user": user})
     
 def increaselikes(request,id):
     if request.method == 'POST':
@@ -145,7 +158,7 @@ def editpost(request,id):
     if request.method == 'POST':
         try:
             postname = request.POST['postname']
-            content = request.POST['content']
+            content  = request.POST['content']
             category = request.POST['category']
             
             post.postname = postname
@@ -155,7 +168,7 @@ def editpost(request,id):
         except:
             print("Error")
         return profile(request,request.user.id)
-    
+     
     return render(request,"postedit.html",{
         'post':post
     })
